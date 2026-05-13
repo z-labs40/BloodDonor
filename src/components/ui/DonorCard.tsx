@@ -12,15 +12,16 @@ interface DonorCardProps {
 }
 
 const statusConfig = {
-  verified: { label: 'Verified', icon: CheckCircle, className: 'status-verified' },
-  pending: { label: 'Pending', icon: Clock, className: 'status-pending' },
-  rejected: { label: 'Rejected', icon: XCircle, className: 'status-rejected' },
+  VERIFIED: { label: 'Verified', icon: CheckCircle, className: 'status-verified' },
+  PENDING: { label: 'Pending', icon: Clock, className: 'status-pending' },
+  REJECTED: { label: 'Rejected', icon: XCircle, className: 'status-rejected' },
 };
 
 export default function DonorCard({ donor, onContact }: DonorCardProps) {
   const { user } = useAuth();
-  const status = statusConfig[donor.status];
+  const status = statusConfig[donor.status as keyof typeof statusConfig] ?? statusConfig.PENDING;
   const StatusIcon = status.icon;
+  const donorName = donor.user?.name ?? 'Unknown';
 
   return (
     <div
@@ -61,11 +62,11 @@ export default function DonorCard({ donor, onContact }: DonorCardProps) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 700, fontSize: '16px', color: '#fca5a5',
           }}>
-            {donor.name.charAt(0)}
+            {donorName.charAt(0).toUpperCase()}
           </div>
           <div>
             <p style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)', marginBottom: '2px' }}>
-              {donor.name}
+              {donorName}
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span className={status.className} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -75,7 +76,7 @@ export default function DonorCard({ donor, onContact }: DonorCardProps) {
             </div>
           </div>
         </div>
-        <div className="blood-badge">{donor.bloodGroup}</div>
+        <div className="blood-badge">{donor.bloodGroupDisplay ?? donor.bloodGroup}</div>
       </div>
 
       {/* Info grid */}
@@ -92,7 +93,7 @@ export default function DonorCard({ donor, onContact }: DonorCardProps) {
       </div>
 
       {/* Contact button — only logged in users, only verified donors */}
-      {user && donor.status === 'verified' && (
+      {user && donor.status === 'VERIFIED' && (
         <button
           onClick={() => onContact?.(donor)}
           className="btn-primary"

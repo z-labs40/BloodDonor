@@ -1,8 +1,9 @@
+// Display labels used in UI
 export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'O+' | 'O-' | 'AB+' | 'AB-';
 
-export type UserRole = 'user' | 'admin';
+export type UserRole = 'USER' | 'ADMIN';
 
-export type DonorStatus = 'pending' | 'verified' | 'rejected';
+export type DonorStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export interface User {
   id: string;
@@ -15,29 +16,34 @@ export interface User {
 export interface Donor {
   id: string;
   userId: string;
-  name: string;
+  user?: User;
   bloodGroup: BloodGroup;
+  bloodGroupDisplay?: string;
   department: string;
   year: string;
-  phone: string;
+  phone?: string;
   hostel: string;
   availability: boolean;
   status: DonorStatus;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface EmergencyRequest {
   id: string;
   requesterId: string;
-  requesterName: string;
+  requester?: User;
+  requesterName?: string;
   bloodGroup: BloodGroup;
-  message: string;
-  status: 'open' | 'fulfilled' | 'closed';
+  bloodGroupDisplay?: string;
+  message?: string | null;
+  status: 'OPEN' | 'FULFILLED' | 'CLOSED';
   createdAt: string;
 }
 
 export interface AuthState {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
 }
 
@@ -58,12 +64,13 @@ export const DEPARTMENTS = [
   'Management Studies',
 ];
 
-export const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Postgraduate'];
+export const YEARS = ['1st', '2nd', '3rd', '4th', 'Postgraduate'];
 
 export const HOSTELS = [
-  'Boys Hostel A',
-  'Boys Hostel B',
-  'Boys Hostel C',
+  'Block A',
+  'Block B',
+  'Block C',
+  'Block D',
   'Girls Hostel A',
   'Girls Hostel B',
   'Day Scholar',

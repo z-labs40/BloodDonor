@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Droplets } from 'lucide-react';
 
 export default function AdminLoginPage() {
-  const { login, user } = useAuth();
+  const { adminLogin, user } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,18 +17,18 @@ export default function AdminLoginPage() {
 
   // Already logged in as admin — redirect after render, not during
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'ADMIN') {
       router.replace('/admin');
     }
   }, [user, router]);
 
-  if (user?.role === 'admin') return null;
+  if (user?.role === 'ADMIN') return null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await login(email, password);
+    const result = await adminLogin(email, password);
     setLoading(false);
     if (result.success) {
       // Check if the logged-in user is actually admin

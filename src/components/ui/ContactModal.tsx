@@ -13,8 +13,10 @@ export default function ContactModal({ donor, onClose }: ContactModalProps) {
   const [copied, setCopied] = useState(false);
 
   if (!donor) return null;
+  const donorName = donor.user?.name ?? 'Unknown';
 
   const handleCopy = () => {
+    if (!donor.phone) return;
     navigator.clipboard.writeText(donor.phone);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -55,10 +57,10 @@ export default function ContactModal({ donor, onClose }: ContactModalProps) {
             margin: '0 auto 16px',
             fontSize: '24px', fontWeight: 700, color: '#fca5a5',
           }}>
-            {donor.name.charAt(0)}
+            {donorName.charAt(0).toUpperCase()}
           </div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>{donor.name}</h2>
-          <div className="blood-badge" style={{ margin: '0 auto 8px', display: 'inline-flex' }}>{donor.bloodGroup}</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>{donorName}</h2>
+          <div className="blood-badge" style={{ margin: '0 auto 8px', display: 'inline-flex' }}>{donor.bloodGroupDisplay ?? donor.bloodGroup}</div>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
             {donor.department} · {donor.year}
           </p>
@@ -74,7 +76,7 @@ export default function ContactModal({ donor, onClose }: ContactModalProps) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Phone size={18} color="#ef4444" />
-            <span style={{ fontWeight: 600, fontSize: '16px', letterSpacing: '0.5px' }}>{donor.phone}</span>
+            <span style={{ fontWeight: 600, fontSize: '16px', letterSpacing: '0.5px' }}>{donor.phone ?? 'N/A'}</span>
           </div>
           <button
             onClick={handleCopy}

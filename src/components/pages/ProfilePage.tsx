@@ -1,28 +1,28 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import { useAuth } from '@/context/AuthContext';
 import { useDonors } from '@/context/DonorContext';
 import { BloodGroup, BLOOD_GROUPS, DEPARTMENTS, HOSTELS, YEARS } from '@/types';
-import { Donor } from '@/types';
 import {
   User, Phone, Building, Calendar, MapPin, Heart, Edit3,
   Save, X, CheckCircle, Clock, XCircle, Droplets, AlertCircle,
-  UserPlus
+  UserPlus, Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const { donors, addDonor, getDonorByUserId } = useDonors();
+  const { myDonorProfile, registerDonor, updateMyProfile, deleteMyProfile, fetchMyProfile } = useDonors();
   const router = useRouter();
 
-  const existingDonor = user ? getDonorByUserId(user.id) : undefined;
   const [isRegistering, setIsRegistering] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     bloodGroup: '' as BloodGroup | '',
@@ -32,6 +32,23 @@ export default function ProfilePage() {
     hostel: '',
     availability: true,
   });
+
+  const [editForm, setEditForm] = useState({
+    phone: '',
+    hostel: '',
+    availability: true,
+  });
+
+  // Pre-fill edit form when profile loads
+  useEffect(() => {
+    if (myDonorProfile) {
+      setEditForm({
+        phone: myDonorProfile.phone ?? '',
+        hostel: myDonorProfile.hostel,
+        availability: myDonorProfile.availability,
+      });
+    }
+  }, [myDonorProfile]);
 
   if (!user) {
     return (
@@ -47,27 +64,52 @@ export default function ProfilePage() {
     );
   }
 
-  const handleRegisterSubmit = (e: FormEvent) => {
+  const handleRegisterSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.bloodGroup) return;
-    addDonor({
-      userId: user.id,
-      name: user.name,
-      bloodGroup: form.bloodGroup as BloodGroup,
+    setSubmitting(true);
+    setError('');
+    const result = await registerDonor({
+      bloodGroup: form.bloodGroup,
       department: form.department,
       year: form.year,
       phone: form.phone,
       hostel: form.hostel,
       availability: form.availability,
     });
-    setIsRegistering(false);
-    setSuccess('Donor profile submitted for admin verification!');
-    setTimeout(() => setSuccess(''), 4000);
+    setSubmitting(false);
+    if (result.success) {
+      setIsRegistering(false);
+      setSuccess('Donor profile submitted for admin verification!');
+      setTimeout(() => setSuccess(''), 4000);
+    } else {
+      setError(result.error ?? 'Registration failed.');
+    }
   };
 
-  const statusIcon = existingDonor
-    ? { verified: <CheckCircle size={16} color="var(--success)" />, pending: <Clock size={16} color="var(--warning)" />, rejected: <XCircle size={16} color="var(--danger)" /> }[existingDonor.status]
+  const handleEditSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!myDonorProfile) return;
+    setSubmitting(true);
+    setError('');
+    const result = await updateMyProfile(myDonorProfile.id, editForm);
+    setSubmitting(false);
+    if (result.success) {
+      setIsEditing(false);
+      setSuccess('Profile updated successfully!');
+      setTimeout(() => setSuccess(''), 4000);
+    } else {
+      setError(result.error ?? 'Update failed.');
+    }
+  };
+
+  const statusIcon = myDonorProfile
+    ? { VERIFIED: <CheckCircle size={16} color="var(--success)" />, PENDING: <Clock size={16} color="var(--warning)" />, REJECTED: <XCircle size={16} color="var(--danger)" /> }[myDonorProfile.status]
     : null;
+
+  const statusLabel = myDonorProfile
+    ? { VERIFIED: 'Verified', PENDING: 'Pending', REJECTED: 'Rejected' }[myDonorProfile.status]
+    : '';
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -89,6 +131,16 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {error && (
+          <div style={{
+            background: 'var(--danger-soft)', border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: '10px', padding: '14px 18px', marginBottom: '24px',
+            display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--danger)', fontSize: '14px',
+          }}>
+            <AlertCircle size={18} /> {error}
+          </div>
+        )}
+
         {/* Account info card */}
         <div className="glass-card" style={{ padding: '24px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
@@ -99,7 +151,7 @@ export default function ProfilePage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '24px', fontWeight: 700, color: '#fca5a5',
             }}>
-              {user.name.charAt(0)}
+              {user.name.charAt(0).toUpperCase()}
             </div>
             <div>
               <p style={{ fontWeight: 700, fontSize: '18px' }}>{user.name}</p>
@@ -107,11 +159,11 @@ export default function ProfilePage() {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '4px',
                 fontSize: '12px', marginTop: '4px',
-                ...(user.role === 'admin'
+                ...(user.role === 'ADMIN'
                   ? { color: '#6366f1', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '20px', padding: '2px 10px' }
                   : { color: 'var(--text-muted)' })
               }}>
-                {user.role === 'admin' ? '⚡ Administrator' : '👤 Student'}
+                {user.role === 'ADMIN' ? '⚡ Administrator' : '👤 Student'}
               </span>
             </div>
           </div>
@@ -124,7 +176,7 @@ export default function ProfilePage() {
             >
               Sign Out
             </button>
-            {user.role === 'admin' && (
+            {user.role === 'ADMIN' && (
               <Link href="/admin" style={{ textDecoration: 'none' }}>
                 <button className="btn-primary" style={{ padding: '9px 16px', fontSize: '13px' }}>Admin Dashboard</button>
               </Link>
@@ -132,21 +184,30 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Donor profile section */}
-        {existingDonor && !isRegistering ? (
+        {/* Donor profile section — view */}
+        {myDonorProfile && !isRegistering && !isEditing && (
           <div className="glass-card" style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>Donor Registration</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                   {statusIcon}
-                  <span className={`status-${existingDonor.status}`}>{existingDonor.status.charAt(0).toUpperCase() + existingDonor.status.slice(1)}</span>
+                  <span className={`status-${myDonorProfile.status.toLowerCase()}`}>{statusLabel}</span>
                 </div>
               </div>
-              <div className="blood-badge" style={{ fontSize: '18px', padding: '8px 16px' }}>{existingDonor.bloodGroup}</div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="blood-badge" style={{ fontSize: '18px', padding: '8px 16px' }}>{myDonorProfile.bloodGroup}</div>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="btn-secondary"
+                  style={{ padding: '7px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Edit3 size={14} /> Edit
+                </button>
+              </div>
             </div>
 
-            {existingDonor.status === 'pending' && (
+            {myDonorProfile.status === 'PENDING' && (
               <div style={{
                 background: 'var(--warning-soft)', border: '1px solid rgba(245,158,11,0.2)',
                 borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
@@ -158,10 +219,10 @@ export default function ProfilePage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
               {[
-                { icon: Building, label: 'Department', value: existingDonor.department },
-                { icon: Calendar, label: 'Year', value: existingDonor.year },
-                { icon: Phone, label: 'Phone', value: existingDonor.phone },
-                { icon: MapPin, label: 'Hostel / Area', value: existingDonor.hostel },
+                { icon: Building, label: 'Department', value: myDonorProfile.department },
+                { icon: Calendar, label: 'Year', value: myDonorProfile.year },
+                { icon: Phone, label: 'Phone', value: myDonorProfile.phone ?? '—' },
+                { icon: MapPin, label: 'Hostel / Area', value: myDonorProfile.hostel },
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -174,15 +235,60 @@ export default function ProfilePage() {
               <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <Heart size={13} color="var(--text-muted)" />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Availability</span>
                 </div>
-                <p style={{ fontSize: '14px', fontWeight: 500, color: existingDonor.availability ? 'var(--success)' : 'var(--text-muted)' }}>
-                  {existingDonor.availability ? 'Available' : 'Not Available'}
+                <p style={{ fontSize: '14px', fontWeight: 500, color: myDonorProfile.availability ? 'var(--success)' : 'var(--text-muted)' }}>
+                  {myDonorProfile.availability ? 'Available' : 'Not Available'}
                 </p>
               </div>
             </div>
           </div>
-        ) : !isRegistering ? (
+        )}
+
+        {/* Edit form */}
+        {isEditing && myDonorProfile && (
+          <div className="glass-card animate-scale-in" style={{ padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Edit Donor Profile</h2>
+              <button onClick={() => setIsEditing(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} style={{ display: 'grid', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Phone Number</label>
+                  <input type="tel" className="input-base" placeholder="+91 98765 43210"
+                    value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Hostel / Area</label>
+                  <select className="input-base" value={editForm.hostel} onChange={e => setEditForm(f => ({ ...f, hostel: e.target.value }))}>
+                    {HOSTELS.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={editForm.availability}
+                      onChange={e => setEditForm(f => ({ ...f, availability: e.target.checked }))}
+                      style={{ width: '18px', height: '18px', accentColor: '#ef4444', cursor: 'pointer' }} />
+                    <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>I&apos;m currently available</span>
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1, padding: '12px' }} disabled={submitting}>
+                  {submitting ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button type="button" onClick={() => setIsEditing(false)} className="btn-secondary" style={{ padding: '12px 20px' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* No profile yet */}
+        {!myDonorProfile && !isRegistering && (
           <div className="glass-card" style={{ padding: '32px', textAlign: 'center' }}>
             <Droplets size={40} color="var(--crimson)" style={{ margin: '0 auto 16px', display: 'block' }} />
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Register as a Donor</h2>
@@ -194,7 +300,7 @@ export default function ProfilePage() {
               Register as Donor
             </button>
           </div>
-        ) : null}
+        )}
 
         {/* Registration form */}
         {isRegistering && (
@@ -209,9 +315,7 @@ export default function ProfilePage() {
             <form onSubmit={handleRegisterSubmit} style={{ display: 'grid', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
                 <div>
-                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-                    Blood Group *
-                  </label>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Blood Group *</label>
                   <select id="regBloodGroup" required className="input-base" value={form.bloodGroup}
                     onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value as BloodGroup }))}>
                     <option value="">Select blood group</option>
@@ -258,9 +362,9 @@ export default function ProfilePage() {
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button type="submit" className="btn-primary" style={{ flex: 1, padding: '12px' }}>
-                  <Save size={16} />
-                  Submit for Review
+                <button type="submit" className="btn-primary" style={{ flex: 1, padding: '12px' }} disabled={submitting}>
+                  {submitting ? <Loader2 size={16} /> : <Save size={16} />}
+                  {submitting ? 'Submitting...' : 'Submit for Review'}
                 </button>
                 <button type="button" onClick={() => setIsRegistering(false)} className="btn-secondary" style={{ padding: '12px 20px' }}>
                   Cancel

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import { useAuth } from '@/context/AuthContext';
 import { useDonors } from '@/context/DonorContext';
@@ -11,39 +11,41 @@ import {
 import Link from 'next/link';
 
 const statusConfig = {
-  open: { label: 'Open', icon: Clock, color: 'var(--warning)', bg: 'var(--warning-soft)', border: 'rgba(245,158,11,0.2)' },
-  fulfilled: { label: 'Fulfilled', icon: CheckCircle, color: 'var(--success)', bg: 'var(--success-soft)', border: 'rgba(16,185,129,0.2)' },
-  closed: { label: 'Closed', icon: XCircle, color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.03)', border: 'var(--border-subtle)' },
+  OPEN: { label: 'Open', icon: Clock, color: 'var(--warning)', bg: 'var(--warning-soft)', border: 'rgba(245,158,11,0.2)' },
+  FULFILLED: { label: 'Fulfilled', icon: CheckCircle, color: 'var(--success)', bg: 'var(--success-soft)', border: 'rgba(16,185,129,0.2)' },
+  CLOSED: { label: 'Closed', icon: XCircle, color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.03)', border: 'var(--border-subtle)' },
 };
 
 export default function EmergencyPage() {
   const { user } = useAuth();
-  const { emergencyRequests, addEmergencyRequest } = useDonors();
+  const { emergencyRequests, addEmergencyRequest, fetchEmergencies } = useDonors();
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | ''>('');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => { fetchEmergencies(); }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user || !bloodGroup) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    addEmergencyRequest({
-      requesterId: user.id,
-      requesterName: user.name,
-      bloodGroup: bloodGroup as BloodGroup,
-      message,
-    });
+    setError('');
+    const result = await addEmergencyRequest(bloodGroup, message || undefined);
     setLoading(false);
-    setSubmitted(true);
-    setBloodGroup('');
-    setMessage('');
-    setTimeout(() => setSubmitted(false), 5000);
+    if (result.success) {
+      setSubmitted(true);
+      setBloodGroup('');
+      setMessage('');
+      setTimeout(() => setSubmitted(false), 5000);
+    } else {
+      setError(result.error ?? 'Failed to post request.');
+    }
   };
 
-  const openRequests = emergencyRequests.filter(r => r.status === 'open');
-  const otherRequests = emergencyRequests.filter(r => r.status !== 'open');
+  const openRequests = emergencyRequests.filter(r => r.status === 'OPEN');
+  const otherRequests = emergencyRequests.filter(r => r.status !== 'OPEN');
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -181,16 +183,18 @@ export default function EmergencyPage() {
 }
 
 function RequestCard({ req }: { req: EmergencyRequest }) {
-  const cfg = statusConfig[req.status];
+  const cfg = statusConfig[req.status as keyof typeof statusConfig] ?? statusConfig.OPEN;
   const Icon = cfg.icon;
+  const name = req.requesterName || req.requester?.name || 'Anonymous';
+  const date = new Date(req.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
   return (
     <div className="glass-card" style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="blood-badge">{req.bloodGroup}</div>
+          <div className="blood-badge">{req.bloodGroupDisplay ?? req.bloodGroup}</div>
           <div>
-            <p style={{ fontWeight: 600, fontSize: '14px' }}>{req.requesterName}</p>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{req.createdAt}</p>
+            <p style={{ fontWeight: 600, fontSize: '14px' }}>{name}</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{date}</p>
           </div>
         </div>
         <span style={{
@@ -213,3 +217,4 @@ function RequestCard({ req }: { req: EmergencyRequest }) {
     </div>
   );
 }
+

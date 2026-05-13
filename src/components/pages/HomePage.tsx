@@ -15,21 +15,21 @@ import {
   Users, Heart, ShieldCheck, Zap
 } from 'lucide-react';
 
-const STATS = [
-  { label: 'Registered Donors', value: '120+', icon: Users, color: '#ef4444' },
-  { label: 'Lives Saved', value: '48', icon: Heart, color: '#f97316' },
-  { label: 'Verified Profiles', value: '95%', icon: ShieldCheck, color: '#10b981' },
-  { label: 'Response Time', value: '<30min', icon: Zap, color: '#6366f1' },
-];
-
 export default function HomePage() {
-  const { donors } = useDonors();
+  const { donors, emergencyRequests } = useDonors();
   const { user } = useAuth();
   const router = useRouter();
   const [contactDonor, setContactDonor] = useState<Donor | null>(null);
 
-  const verifiedDonors = donors.filter(d => d.status === 'verified' && d.availability);
+  const verifiedDonors = donors.filter(d => d.status === 'VERIFIED' && d.availability);
   const featuredDonors = verifiedDonors.slice(0, 3);
+
+  const stats = [
+    { label: 'Registered Donors', value: `${donors.length}+`, icon: Users, color: '#ef4444' },
+    { label: 'Active Requests', value: `${emergencyRequests.filter(r => r.status === 'OPEN').length}`, icon: Heart, color: '#f97316' },
+    { label: 'Verified Profiles', value: `${donors.filter(d => d.status === 'VERIFIED').length}`, icon: ShieldCheck, color: '#10b981' },
+    { label: 'Emergency Alerts', value: `${emergencyRequests.length}`, icon: Zap, color: '#6366f1' },
+  ];
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -149,7 +149,7 @@ export default function HomePage() {
       <section style={{ padding: '0 24px 70px' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            {STATS.map(({ label, value, icon: Icon, color }) => (
+            {stats.map(({ label, value, icon: Icon, color }) => (
               <div key={label} className="glass-card" style={{ padding: '24px', textAlign: 'center' }}>
                 <div style={{
                   width: '48px', height: '48px', borderRadius: '12px', margin: '0 auto 14px',

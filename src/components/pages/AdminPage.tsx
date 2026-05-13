@@ -18,19 +18,30 @@ type Tab = 'overview' | 'donors' | 'requests';
 
 export default function AdminPage() {
   const { user } = useAuth();
-  const { donors, emergencyRequests, updateDonorStatus, removeDonor, updateRequestStatus } = useDonors();
+  const {
+    adminDonors, adminStats, emergencyRequests,
+    fetchAdminDonors, fetchAdminStats, fetchEmergencies,
+    updateDonorStatus, removeDonor, updateRequestStatus,
+  } = useDonors();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [filter, setFilter] = useState<'all' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('all');
   const router = useRouter();
 
-  // Redirect non-admins to the admin login page
+  // Redirect non-admins
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== 'ADMIN') {
       router.replace('/admin/login');
     }
   }, [user, router]);
 
-  if (!user || user.role !== 'admin') {
+  // Load admin data on mount
+  useEffect(() => {
+    fetchAdminDonors();
+    fetchAdminStats();
+    fetchEmergencies();
+  }, []);
+
+  if (!user || user.role !== 'ADMIN') {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: '32px', height: '32px', border: '2px solid rgba(220,38,38,0.3)', borderTopColor: '#ef4444', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -40,21 +51,22 @@ export default function AdminPage() {
   }
 
 
-  // Stats
-  const totalDonors = donors.length;
-  const verifiedDonors = donors.filter(d => d.status === 'verified').length;
-  const pendingDonors = donors.filter(d => d.status === 'pending').length;
-  const availableDonors = donors.filter(d => d.status === 'verified' && d.availability).length;
-  const openRequests = emergencyRequests.filter(r => r.status === 'open').length;
+  // Stats from API or compute from adminDonors as fallback
+  const totalDonors      = adminStats?.totalDonors      ?? adminDonors.length;
+  const verifiedDonors   = adminStats?.verifiedDonors   ?? adminDonors.filter(d => d.status === 'VERIFIED').length;
+  const pendingDonors    = adminStats?.pendingDonors    ?? adminDonors.filter(d => d.status === 'PENDING').length;
+  const availableDonors  = adminStats?.availableDonors  ?? adminDonors.filter(d => d.status === 'VERIFIED' && d.availability).length;
+  const openRequests     = adminStats?.openEmergencies  ?? emergencyRequests.filter(r => r.status === 'OPEN').length;
 
-  // Blood group distribution
-  const bloodGroupData = BLOOD_GROUPS.map(bg => ({
-    group: bg,
-    count: donors.filter(d => d.bloodGroup === bg && d.status === 'verified').length,
-  }));
+  // Blood group chart data — prefer API stats, fallback to computing from adminDonors
+  const bloodGroupData = adminStats?.donorsByBloodGroup
+    ? Object.entries(adminStats.donorsByBloodGroup).map(([group, count]) => ({ group, count }))
+    : BLOOD_GROUPS.map(bg => ({
+        group: bg,
+        count: adminDonors.filter(d => d.bloodGroup === bg && d.status === 'VERIFIED').length,
+      }));
 
-  // Filtered donors list
-  const filteredDonors = donors.filter(d => filter === 'all' || d.status === filter);
+  const filteredDonors = filter === 'all' ? adminDonors : adminDonors.filter(d => d.status === filter);
 
   const CHART_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#6366f1', '#a855f7', '#ec4899'];
 
@@ -166,7 +178,7 @@ export default function AdminPage() {
           <div className="animate-fade-up">
             {/* Filter buttons */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-              {(['all', 'pending', 'verified', 'rejected'] as const).map(f => (
+              {(['all', 'PENDING', 'VERIFIED', 'REJECTED'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -179,8 +191,8 @@ export default function AdminPage() {
                     color: filter === f ? '#fca5a5' : 'var(--text-secondary)',
                   }}
                 >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                  {' '}({donors.filter(d => f === 'all' || d.status === f).length})
+                  {f === 'all' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+                  {' '}({f === 'all' ? adminDonors.length : adminDonors.filter(d => d.status === f).length})
                 </button>
               ))}
             </div>
@@ -188,8 +200,8 @@ export default function AdminPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filteredDonors.map(donor => (
                 <AdminDonorRow key={donor.id} donor={donor}
-                  onVerify={() => updateDonorStatus(donor.id, 'verified')}
-                  onReject={() => updateDonorStatus(donor.id, 'rejected')}
+                  onVerify={() => updateDonorStatus(donor.id, 'VERIFIED')}
+                  onReject={() => updateDonorStatus(donor.id, 'REJECTED')}
                   onRemove={() => removeDonor(donor.id)}
                 />
               ))}
@@ -207,23 +219,23 @@ export default function AdminPage() {
               <div key={req.id} className="glass-card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div className="blood-badge">{req.bloodGroup}</div>
+                    <div className="blood-badge">{req.bloodGroupDisplay ?? req.bloodGroup}</div>
                     <div>
-                      <p style={{ fontWeight: 600, fontSize: '14px' }}>{req.requesterName}</p>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{req.createdAt}</p>
+                      <p style={{ fontWeight: 600, fontSize: '14px' }}>{req.requesterName || req.requester?.name || 'Unknown'}</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(req.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {req.status === 'open' && (
+                    {req.status === 'OPEN' && (
                       <>
                         <button
-                          onClick={() => updateRequestStatus(req.id, 'fulfilled')}
+                          onClick={() => updateRequestStatus(req.id, 'FULFILLED')}
                           style={{ padding: '7px 14px', background: 'var(--success-soft)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '7px', color: 'var(--success)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '5px' }}
                         >
                           <CheckCircle size={13} /> Mark Fulfilled
                         </button>
                         <button
-                          onClick={() => updateRequestStatus(req.id, 'closed')}
+                          onClick={() => updateRequestStatus(req.id, 'CLOSED')}
                           style={{ padding: '7px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', borderRadius: '7px', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}
                         >
                           Close
@@ -232,11 +244,11 @@ export default function AdminPage() {
                     )}
                     <span style={{
                       padding: '7px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 600,
-                      background: req.status === 'open' ? 'var(--warning-soft)' : req.status === 'fulfilled' ? 'var(--success-soft)' : 'rgba(255,255,255,0.04)',
-                      color: req.status === 'open' ? 'var(--warning)' : req.status === 'fulfilled' ? 'var(--success)' : 'var(--text-muted)',
-                      border: `1px solid ${req.status === 'open' ? 'rgba(245,158,11,0.2)' : req.status === 'fulfilled' ? 'rgba(16,185,129,0.2)' : 'var(--border-subtle)'}`,
+                      background: req.status === 'OPEN' ? 'var(--warning-soft)' : req.status === 'FULFILLED' ? 'var(--success-soft)' : 'rgba(255,255,255,0.04)',
+                      color: req.status === 'OPEN' ? 'var(--warning)' : req.status === 'FULFILLED' ? 'var(--success)' : 'var(--text-muted)',
+                      border: `1px solid ${req.status === 'OPEN' ? 'rgba(245,158,11,0.2)' : req.status === 'FULFILLED' ? 'rgba(16,185,129,0.2)' : 'var(--border-subtle)'}`,
                     }}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                      {req.status.charAt(0) + req.status.slice(1).toLowerCase()}
                     </span>
                   </div>
                 </div>
@@ -271,12 +283,12 @@ function AdminDonorRow({
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontWeight: 700, color: '#fca5a5', fontSize: '15px',
         }}>
-          {donor.name.charAt(0)}
+          {(donor.user?.name ?? '?').charAt(0).toUpperCase()}
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <p style={{ fontWeight: 600, fontSize: '14px' }}>{donor.name}</p>
-            <span className="blood-badge" style={{ fontSize: '11px', padding: '2px 8px' }}>{donor.bloodGroup}</span>
+            <p style={{ fontWeight: 600, fontSize: '14px' }}>{donor.user?.name ?? 'Unknown'}</p>
+            <span className="blood-badge" style={{ fontSize: '11px', padding: '2px 8px' }}>{donor.bloodGroupDisplay ?? donor.bloodGroup}</span>
           </div>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             {donor.department} · {donor.year} · {donor.hostel}
@@ -285,14 +297,14 @@ function AdminDonorRow({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <span className={`status-${donor.status}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          {donor.status === 'verified' && <CheckCircle size={10} />}
-          {donor.status === 'pending' && <Clock size={10} />}
-          {donor.status === 'rejected' && <XCircle size={10} />}
-          {donor.status}
+        <span className={`status-${donor.status.toLowerCase()}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          {donor.status === 'VERIFIED' && <CheckCircle size={10} />}
+          {donor.status === 'PENDING' && <Clock size={10} />}
+          {donor.status === 'REJECTED' && <XCircle size={10} />}
+          {donor.status.charAt(0) + donor.status.slice(1).toLowerCase()}
         </span>
 
-        {donor.status !== 'verified' && (
+        {donor.status !== 'VERIFIED' && (
           <button onClick={onVerify} style={{
             padding: '6px 12px', background: 'var(--success-soft)', border: '1px solid rgba(16,185,129,0.2)',
             borderRadius: '6px', color: 'var(--success)', fontSize: '12px', fontWeight: 600,
@@ -301,7 +313,7 @@ function AdminDonorRow({
             <CheckCircle size={12} /> Verify
           </button>
         )}
-        {donor.status !== 'rejected' && (
+        {donor.status !== 'REJECTED' && (
           <button onClick={onReject} style={{
             padding: '6px 12px', background: 'var(--danger-soft)', border: '1px solid rgba(239,68,68,0.2)',
             borderRadius: '6px', color: 'var(--danger)', fontSize: '12px', fontWeight: 600,

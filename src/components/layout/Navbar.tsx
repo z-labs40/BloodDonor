@@ -82,7 +82,7 @@ export default function Navbar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {user ? (
               <>
-                {user.role === 'admin' && (
+                {user.role === 'ADMIN' && (
                   <Link href="/admin" style={{ textDecoration: 'none' }}>
                     <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px', gap: '6px' }}>
                       <ShieldCheck size={14} />
@@ -155,7 +155,7 @@ export default function Navbar() {
                 <User size={17} /> My Profile
               </Link>
             )}
-            {user?.role === 'admin' && (
+            {user?.role === 'ADMIN' && (
               <Link href="/admin" onClick={() => setMenuOpen(false)} style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '12px 16px', borderRadius: '8px', textDecoration: 'none',

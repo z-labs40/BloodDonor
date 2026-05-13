@@ -14,7 +14,7 @@ import Link from 'next/link';
 function SearchContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { donors } = useDonors();
+  const { donors, fetchDonors } = useDonors();
 
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | ''>(
     (searchParams.get('bloodGroup') as BloodGroup) || ''
@@ -27,8 +27,8 @@ function SearchContent() {
   const [contactDonor, setContactDonor] = useState<Donor | null>(null);
 
   const filtered = donors.filter(d => {
-    if (d.status !== 'verified') return false;
-    if (bloodGroup && d.bloodGroup !== bloodGroup) return false;
+    if (d.status !== 'VERIFIED') return false;
+    if (bloodGroup && d.bloodGroup !== bloodGroup && d.bloodGroupDisplay !== bloodGroup) return false;
     if (department && d.department !== department) return false;
     if (hostel && d.hostel !== hostel) return false;
     if (year && d.year !== year) return false;
@@ -57,7 +57,7 @@ function SearchContent() {
             <span className="gradient-text">Find</span> a Blood Donor
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Search {donors.filter(d => d.status === 'verified').length} verified donors across campus
+            Search {donors.filter(d => d.status === 'VERIFIED').length} verified donors across campus
           </p>
         </div>
 

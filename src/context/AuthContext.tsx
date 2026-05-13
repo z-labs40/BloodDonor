@@ -2,68 +2,90 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthState } from '@/types';
-import { MOCK_USERS } from '@/data/mockData';
+import { authApi, BG_TO_DISPLAY } from '@/utils/api';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  adminLogin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function apiUserToUser(u: { id: string; name: string; email: string; role: string; createdAt: string }): User {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role as User['role'],
+    createdAt: u.createdAt,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({ user: null, isLoading: true });
+  const [authState, setAuthState] = useState<AuthState>({ user: null, token: null, isLoading: true });
 
   useEffect(() => {
     // Rehydrate from localStorage
-    const stored = localStorage.getItem('blooddonor_user');
-    if (stored) {
-      try {
-        const user: User = JSON.parse(stored);
-        setAuthState({ user, isLoading: false });
-      } catch {
-        setAuthState({ user: null, isLoading: false });
+    try {
+      const storedUser = localStorage.getItem('blooddonor_user');
+      const storedToken = localStorage.getItem('blooddonor_token');
+      if (storedUser && storedToken) {
+        setAuthState({ user: JSON.parse(storedUser), token: storedToken, isLoading: false });
+        return;
       }
-    } else {
-      setAuthState({ user: null, isLoading: false });
-    }
+    } catch { /* ignore */ }
+    setAuthState({ user: null, token: null, isLoading: false });
   }, []);
 
-  const login = async (email: string, _password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!user) return { success: false, error: 'Invalid email or password.' };
+  const persist = (user: User, token: string) => {
     localStorage.setItem('blooddonor_user', JSON.stringify(user));
-    setAuthState({ user, isLoading: false });
-    return { success: true };
+    localStorage.setItem('blooddonor_token', token);
+    setAuthState({ user, token, isLoading: false });
   };
 
-  const signup = async (name: string, email: string, _password: string): Promise<{ success: boolean; error?: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const existing = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) return { success: false, error: 'An account with this email already exists.' };
-    const newUser: User = {
-      id: `u${Date.now()}`,
-      name,
-      email,
-      role: 'user',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    MOCK_USERS.push(newUser);
-    localStorage.setItem('blooddonor_user', JSON.stringify(newUser));
-    setAuthState({ user: newUser, isLoading: false });
-    return { success: true };
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await authApi.login(email, password);
+      persist(apiUserToUser(res.user), res.token);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Login failed.' };
+    }
+  };
+
+  const adminLogin = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await authApi.adminLogin(email, password);
+      if (res.user.role !== 'ADMIN') {
+        return { success: false, error: 'Access denied — admin accounts only.' };
+      }
+      persist(apiUserToUser(res.user), res.token);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Admin login failed.' };
+    }
+  };
+
+  const signup = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await authApi.signup(name, email, password);
+      persist(apiUserToUser(res.user), res.token);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Sign up failed.' };
+    }
   };
 
   const logout = () => {
     localStorage.removeItem('blooddonor_user');
-    setAuthState({ user: null, isLoading: false });
+    localStorage.removeItem('blooddonor_token');
+    setAuthState({ user: null, token: null, isLoading: false });
   };
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, signup, logout }}>
+    <AuthContext.Provider value={{ ...authState, login, adminLogin, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
