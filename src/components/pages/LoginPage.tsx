@@ -64,15 +64,7 @@ export default function LoginPage() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Sign in to access the donor directory</p>
         </div>
 
-        {/* Demo hint — user accounts only */}
-        <div style={{
-          background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-          borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
-          fontSize: '13px', color: '#a5b4fc', lineHeight: 1.6,
-        }}>
-          <strong>Demo account:</strong><br />
-          <code>farhan@campus.edu</code> (any password)
-        </div>
+        
 
         <form onSubmit={handleSubmit} className="glass-card" style={{ padding: '32px' }}>
           {error && (

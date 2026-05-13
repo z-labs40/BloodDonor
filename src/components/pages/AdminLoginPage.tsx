@@ -90,15 +90,7 @@ export default function AdminLoginPage() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Restricted access — administrators only</p>
         </div>
 
-        {/* Hint */}
-        <div style={{
-          background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-          borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
-          fontSize: '13px', color: '#a5b4fc', lineHeight: 1.6,
-        }}>
-          <strong>Demo admin:</strong> <code>admin@campus.edu</code> (any password)
-        </div>
-
+       
         <form onSubmit={handleSubmit} className="glass-card" style={{ padding: '32px' }}>
           {error && (
             <div style={{
